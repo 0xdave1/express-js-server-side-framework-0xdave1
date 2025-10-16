@@ -1,71 +1,125 @@
-// server.js - Starter Express server for Week 2 assignment
+// server.js - Week 2 Express.js Assignment
 
-// Import required modules
 const express = require('express');
 const bodyParser = require('body-parser');
 const { v4: uuidv4 } = require('uuid');
 
-// Initialize Express app
+require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const API_KEY = process.env.API_KEY;
 
-// Middleware setup
+// Middleware: JSON parser
 app.use(bodyParser.json());
+
+// Middleware: Logger
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url} @ ${new Date().toISOString()}`);
+  next();
+});
+
+// Middleware: Authentication
+const authenticate = (req, res, next) => {
+  if (req.headers['x-api-key'] === API_KEY) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+};
 
 // Sample in-memory products database
 let products = [
-  {
-    id: '1',
-    name: 'Laptop',
-    description: 'High-performance laptop with 16GB RAM',
-    price: 1200,
-    category: 'electronics',
-    inStock: true
-  },
-  {
-    id: '2',
-    name: 'Smartphone',
-    description: 'Latest model with 128GB storage',
-    price: 800,
-    category: 'electronics',
-    inStock: true
-  },
-  {
-    id: '3',
-    name: 'Coffee Maker',
-    description: 'Programmable coffee maker with timer',
-    price: 50,
-    category: 'kitchen',
-    inStock: false
-  }
+  { id: '1', name: 'Laptop', description: '16GB RAM', price: 1200, category: 'electronics', inStock: true },
+  { id: '2', name: 'Smartphone', description: '128GB storage', price: 800, category: 'electronics', inStock: true },
+  { id: '3', name: 'Coffee Maker', description: 'Timer', price: 50, category: 'kitchen', inStock: false }
 ];
 
-// Root route
+// Root route -Task 1
 app.get('/', (req, res) => {
-  res.send('Welcome to the Product API! Go to /api/products to see all products.');
+  res.send('Hello World');
 });
 
-// TODO: Implement the following routes:
-// GET /api/products - Get all products
-// GET /api/products/:id - Get a specific product
-// POST /api/products - Create a new product
-// PUT /api/products/:id - Update a product
-// DELETE /api/products/:id - Delete a product
+// GET /api/products - List all products (with filtering & pagination)
+app.get('/api/products', authenticate, (req, res) => {
+  let result = [...products];
 
-// Example route implementation for GET /api/products
-app.get('/api/products', (req, res) => {
-  res.json(products);
+  // Filtering
+  if (req.query.category) {
+    result = result.filter(p => p.category === req.query.category);
+  }
+
+  // Pagination
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || result.length;
+  const start = (page - 1) * limit;
+  result = result.slice(start, start + limit);
+
+  res.json(result);
 });
 
-// TODO: Implement custom middleware for:
-// - Request logging
-// - Authentication
-// - Error handling
+// GET /api/products/search?name=term
+app.get('/api/products/search', authenticate, (req, res) => {
+  const term = req.query.name?.toLowerCase();
+  const result = products.filter(p => p.name.toLowerCase().includes(term));
+  res.json(result);
+});
 
-// Start the server
+// GET /api/products/stats - Count by category
+app.get('/api/products/stats', authenticate, (req, res) => {
+  const stats = {};
+  products.forEach(p => {
+    stats[p.category] = (stats[p.category] || 0) + 1;
+  });
+  res.json(stats);
+});
+
+// GET /api/products/:id
+app.get('/api/products/:id', authenticate, (req, res) => {
+  const product = products.find(p => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  res.json(product);
+});
+
+// POST /api/products
+app.post('/api/products', authenticate, (req, res) => {
+  const { name, description, price, category, inStock } = req.body;
+  if (!name || !description || !price || !category || typeof inStock !== 'boolean') {
+    return res.status(400).json({ error: 'Missing or invalid fields' });
+  }
+  const newProduct = { id: uuidv4(), name, description, price, category, inStock };
+  products.push(newProduct);
+  res.status(201).json(newProduct);
+});
+
+// PUT /api/products/:id
+app.put('/api/products/:id', authenticate, (req, res) => {
+  const index = products.findIndex(p => p.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Product not found' });
+
+  const updated = { ...products[index], ...req.body };
+  products[index] = updated;
+  res.json(updated);
+});
+
+// DELETE /api/products/:id
+app.delete('/api/products/:id', authenticate, (req, res) => {
+  const index = products.findIndex(p => p.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Product not found' });
+
+  products.splice(index, 1);
+  res.status(204).send();
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.status || 500).json({ error: err.message });
+});
+
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
 
-// Export the app for testing purposes
-module.exports = app; 
+module.exports = app;

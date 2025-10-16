@@ -1,0 +1,19 @@
+{
+  "name": "express-js-server-side-framework-0xdave1",
+  "version": "1.0.0",
+  "description": "This assignment focuses on building a RESTful API using Express.js, implementing proper routing, middleware, and error handling.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "uuid": "^13.0.0"
+  }
+}
